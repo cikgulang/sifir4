@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="ms" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lightning Student - Thunder Lock</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800;900&display=swap" rel="stylesheet">
+    <!-- MediaPipe Hands CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: radial-gradient(circle at center, #0f172a 0%, #020617 100%);
+            overflow-x: hidden;
+        }
+        .neon-glow {
+            text-shadow: 0 0 10px rgba(56, 189, 248, 0.8), 0 0 20px rgba(56, 189, 248, 0.6), 0 0 30px rgba(56, 189, 248, 0.4);
+        }
+        .neon-box {
+            box-shadow: 0 0 20px rgba(56, 189, 248, 0.3), inset 0 0 15px rgba(56, 189, 248, 0.2);
+        }
+        .neon-box-active {
+            box-shadow: 0 0 35px rgba(234, 179, 8, 0.8), inset 0 0 25px rgba(234, 179, 8, 0.6);
+            border-color: #facc15 !important;
+        }
+        @keyframes pulse-fast {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        .pulse-anim {
+            animation: pulse-fast 1.5s infinite;
+        }
+        /* Custom scrollbar and styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #38bdf8;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="h-full text-white flex flex-col justify-between select-none">
+
+    <header class="w-full max-w-6xl mx-auto p-4 flex flex-wrap justify-between items-center bg-slate-900/80 backdrop-blur-md rounded-b-2xl border-b border-cyan-500/30 shadow-lg z-20">
+        <div class="flex items-center space-x-3">
+            <div class="bg-cyan-500 text-slate-950 font-black px-3 py-1 rounded-xl text-xl shadow-lg neon-box">⚡ Sifir 4</div>
+            <h1 class="text-xl md:text-2xl font-extrabold tracking-wider bg-gradient-to-r from-cyan-400 to-yellow-400 bg-clip-text text-transparent">Thunder Lock</h1>
+        </div>
+        <div class="flex items-center space-x-4 md:space-x-6 mt-2 md:mt-0">
+            <div class="bg-slate-800/90 px-4 py-1.5 rounded-xl border border-slate-700 text-sm md:text-base flex items-center space-x-2">
+                <span>Skor:</span>
+                <span id="score-val" class="font-bold text-cyan-400">0</span>
+            </div>
+            <div class="bg-slate-800/90 px-4 py-1.5 rounded-xl border border-slate-700 text-sm md:text-base flex items-center space-x-2">
+                <span>Masa:</span>
+                <span id="timer-val" class="font-bold text-yellow-400">15s</span>
+            </div>
+            <div class="bg-slate-800/90 px-4 py-1.5 rounded-xl border border-slate-700 text-sm md:text-base flex items-center space-x-2">
+                <span>Nyawa:</span>
+                <div id="lives-container" class="flex space-x-1">
+                    <span class="text-red-500 text-lg">❤️</span>
+                    <span class="text-red-500 text-lg">❤️</span>
+                    <span class="text-red-500 text-lg">❤️</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 w-full max-w-6xl mx-auto p-4 flex flex-col lg:flex-row gap-4 items-center justify-center relative">
+        
+        <!-- Game Area / Question & Choices Container -->
+        <div id="game-arena" class="w-full lg:w-3/5 h-[480px] bg-slate-900/60 backdrop-blur-md rounded-3xl border-2 border-cyan-500/40 p-6 flex flex-col justify-between relative overflow-hidden shadow-2xl">
+            <!-- Background Lightning Canvas Overlay -->
+            <canvas id="fx-canvas" class="absolute inset-0 pointer-events-none z-10 w-full h-full"></canvas>
+
+            <!-- Start Screen Overlay -->
+            <div id="start-screen" class="absolute inset-0 bg-slate-950/90 z-30 flex flex-col items-center justify-center p-6 text-center">
+                <div class="text-6xl mb-4 pulse-anim">⚡</div>
+                <h2 class="text-3xl md:text-4xl font-black mb-3 neon-glow">Lightning Student</h2>
+                <p class="text-slate-300 max-w-md mb-6 text-sm md:text-base">
+                    Gunakan kamera web anda. Halakan tapak tangan terbuka untuk mengunci jawapan. Genggam tangan (Clench Fist) atau tarik untuk melancarkan petir pada jawapan betul!
+                </p>
+                <button onclick="startGame()" class="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black px-8 py-3 rounded-2xl shadow-lg transition-transform transform hover:scale-105 active:scale-95 text-lg neon-box">
+                    Mula Bermain 🚀
+                </button>
+            </div>
+
+            <!-- Game Over / Victory Overlay -->
+            <div id="end-screen" class="absolute inset-0 bg-slate-950/95 z-30 flex flex-col items-center justify-center p-6 text-center hidden">
+                <div id="end-icon" class="text-6xl mb-3">🏆</div>
+                <h2 id="end-title" class="text-3xl md:text-4xl font-black mb-2 neon-glow">Tahniah!</h2>
+                <p id="end-desc" class="text-slate-300 mb-6 text-sm md:text-base">Anda telah menyelesaikan semua cabaran Sifir 4.</p>
+                <div class="bg-slate-900 border border-slate-700 px-6 py-3 rounded-2xl mb-6">
+                    <p class="text-sm text-slate-400">Skor Akhir:</p>
+                    <p id="final-score" class="text-3xl font-black text-cyan-400">0 / 10</p>
+                </div>
+                <button onclick="resetGame()" class="bg-gradient-to-r from-yellow-400 to-amber-500 hover:from-yellow-300 hover:to-amber-400 text-slate-950 font-black px-8 py-3 rounded-2xl shadow-lg transition-transform transform hover:scale-105 active:scale-95 text-lg">
+                    Main Semula 🔄
+                </button>
+            </div>
+
+            <!-- Question Card -->
+            <div class="text-center z-0">
+                <span class="text-xs uppercase tracking-widest text-cyan-400 font-semibold bg-cyan-950/50 px-3 py-1 rounded-full border border-cyan-800">Soalan <span id="q-current">1</span> / 10</span>
+                <h3 id="question-text" class="text-4xl md:text-5xl font-black mt-4 neon-glow tracking-wide text-white">4 × 1 = ?</h3>
+            </div>
+
+            <!-- Choices Grid -->
+            <div id="choices-container" class="grid grid-cols-1 md:grid-cols-3 gap-4 z-0 my-auto">
+                <!-- Choices generated dynamically -->
+            </div>
+
+            <!-- Lock Progress Bar / Status Indicator -->
+            <div class="w-full bg-slate-800 h-3 rounded-full overflow-hidden border border-slate-700 z-0">
+                <div id="lock-progress" class="bg-gradient-to-r from-cyan-400 to-yellow-400 h-full w-0 transition-all duration-150"></div>
+            </div>
+            <div class="text-center text-xs text-slate-400 mt-1 z-0">
+                Status Kunci: <span id="lock-status" class="text-cyan-400 font-semibold">Cari Pilihan...</span>
+            </div>
+        </div>
+
+        <!-- Webcam & Hand Tracker Box -->
+        <div class="w-full lg:w-2/5 h-[480px] bg-slate-900/60 backdrop-blur-md rounded-3xl border-2 border-slate-700 p-4 flex flex-col items-center justify-between relative shadow-2xl">
+            <div class="absolute top-4 left-4 z-10 bg-slate-950/80 px-3 py-1 rounded-lg border border-slate-700 text-xs flex items-center space-x-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping" id="cam-status-dot"></span>
+                <span id="cam-status-text">Kamera Siap</span>
+            </div>
+            <div class="w-full h-full rounded-2xl overflow-hidden relative flex items-center justify-center bg-slate-950 border border-slate-800 mt-6">
+                <!-- Hidden video element processed by MediaPipe -->
+                <video id="webcam" class="absolute inset-0 w-full h-full object-cover -scale-x-100 opacity-60" autoplay playsinline muted></video>
+                <canvas id="output_canvas" class="absolute inset-0 w-full h-full object-cover -scale-x-100 z-10"></canvas>
+                
+                <!-- Hand Cursor Indicator overlay -->
+                <div id="hand-cursor" class="absolute w-8 h-8 rounded-full border-2 border-cyan-400 bg-cyan-400/30 backdrop-blur-sm pointer-events-none z-25 -translate-x-1/2 -translate-y-1/2 transition-all duration-75 hidden flex items-center justify-center text-xs">⚡</div>
+
+                <!-- Guide overlay inside cam -->
+                <div class="absolute bottom-3 left-3 right-3 text-center bg-slate-900/80 backdrop-blur-md px-3 py-2 rounded-xl text-xs border border-slate-700 z-20">
+                    💡 <span id="gesture-instruction">Tunjuk tapak tangan ke skrin & genggam untuk petir!</span>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="w-full max-w-6xl mx-auto p-4 text-center text-xs text-slate-400">
+        <p>Sistem MediaPipe Hands • Dibina untuk Pendidikan Sifir Interaktif & Pengalaman Imersif.</p>
+    </footer>
+
+    <script>
+        // --- Questions Database (Sifir 4) ---
+        const questions = [
+            { q: "4 × 1 = ?", options: [4, 8, 12], answer: 4 },
+            { q: "4 × 2 = ?", options: [6, 8, 10], answer: 8 },
+            { q: "4 × 3 = ?", options: [12, 14, 16], answer: 12 },
+            { q: "4 × 4 = ?", options: [12, 16, 20], answer: 16 },
+            { q: "4 × 5 = ?", options: [20, 24, 18], answer: 20 },
+            { q: "4 × 6 = ?", options: [22, 24, 26], answer: 24 },
+            { q: "4 × 7 = ?", options: [28, 24, 32], answer: 28 },
+            { q: "4 × 8 = ?", options: [30, 32, 36], answer: 32 },
+            { q: "4 × 9 = ?", options: [36, 34, 40], answer: 36 },
+            { q: "4 × 10 = ?", options: [40, 44, 38], answer: 40 }
+        ];
+
+        let currentQuestionIndex = 0;
+        let score = 0;
+        let lives = 3;
+        let timeLeft = 15;
+        let timerInterval = null;
+        let gameActive = false;
+
+        let lockedChoiceIndex = null;
+        let lockTimer = 0;
+        const requiredLockFrames = 25; // frames to sustain fist/lock
+
+        // Audio Context helper for synthetic sound effects
+        let audioCtx = null;
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        function playSound(type) {
+            try {
+                initAudio();
+                if (!audioCtx) return;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                const now = audioCtx.currentTime;
+                if (type === 'lock') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(300, now);
+                    osc.frequency.exponentialRampToValueAtTime(600, now + 0.15);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                    osc.start(now);
+                    osc.stop(now + 0.15);
+                } else if (type === 'strike') {
+                    // Lightning Zap sound simulation
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(800, now);
+                    osc.frequency.exponentialRampToValueAtTime(100, now + 0.3);
+                    gain.gain.setValueAtTime(0.3, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                    osc.start(now);
+                    osc.stop(now + 0.3);
+                } else if (type === 'wrong') {
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(150, now);
+                    osc.frequency.setValueAtTime(100, now + 0.1);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                    osc.start(now);
+                    osc.stop(now + 0.2);
+                }
+            } catch (e) {
+                console.log("Audio error:", e);
+            }
+        }
+
+        // DOM Elements
+        const startScreen = document.getElementById('start-screen');
+        const endScreen = document.getElementById('end-screen');
+        const questionText = document.getElementById('question-text');
+        const choicesContainer = document.getElementById('choices-container');
+        const scoreVal = document.getElementById('score-val');
+        const timerVal = document.getElementById('timer-val');
+        const livesContainer = document.getElementById('lives-container');
+        const qCurrent = document.getElementById('q-current');
+        const lockProgress = document.getElementById('lock-progress');
+        const lockStatus = document.getElementById('lock-status');
+        const gestureInstruction = document.getElementById('gesture-instruction');
+        const handCursor = document.getElementById('hand-cursor');
+        const fxCanvas = document.getElementById('fx-canvas');
+        const ctxFx = fxCanvas.getContext('2d');
+
+        function resizeFxCanvas() {
+            fxCanvas.width = fxCanvas.offsetWidth;
+            fxCanvas.height = fxCanvas.offsetHeight;
+        }
+        window.addEventListener('resize', resizeFxCanvas);
+        resizeFxCanvas();
+
+        function startGame() {
+            startScreen.classList.add('hidden');
+            endScreen.classList.add('hidden');
+            currentQuestionIndex = 0;
+            score = 0;
+            lives = 3;
+            gameActive = true;
+            updateLivesDisplay();
+            scoreVal.textContent = score;
+            loadQuestion();
+            startTimer();
+        }
+
+        function updateLivesDisplay() {
+            let hearts = '';
+            for (let i = 0; i < 3; i++) {
+                hearts += i < lives ? '<span class="text-red-500 text-lg">❤️</span>' : '<span class="text-slate-600 text-lg">🖤</span>';
+            }
+            livesContainer.innerHTML = hearts;
+        }
+
+        function loadQuestion() {
+            if (currentQuestionIndex >= questions.length) {
+                endGame(true);
+                return;
+            }
+            const q = questions[currentQuestionIndex];
+            qCurrent.textContent = currentQuestionIndex + 1;
+            questionText.textContent = q.q;
+
+            choicesContainer.innerHTML = '';
+            q.options.forEach((opt, idx) => {
+                const btn = document.createElement('div');
+                btn.className = "choice-card bg-slate-800/80 border-2 border-slate-700 rounded-2xl p-6 text-center text-3xl font-black transition-all duration-200 flex items-center justify-center cursor-pointer hover:border-cyan-400";
+                btn.id = `choice-${idx}`;
+                btn.innerHTML = `<span>${opt}</span>`;
+                choicesContainer.appendChild(btn);
+            });
+
+            timeLeft = 15;
+            timerVal.textContent = timeLeft + 's';
+            lockedChoiceIndex = null;
+            lockTimer = 0;
+            lockProgress.style.width = '0%';
+        }
+
+        function startTimer() {
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                if (!gameActive) return;
+                timeLeft--;
+                timerVal.textContent = timeLeft + 's';
+                if (timeLeft <= 0) {
+                    handleTimeOut();
+                }
+            }, 1000);
+        }
+
+        function handleTimeOut() {
+            lives--;
+            updateLivesDisplay();
+            playSound('wrong');
+            triggerFlash('rgba(239, 68, 68, 0.3)');
+            if (lives <= 0) {
+                endGame(false);
+            } else {
+                currentQuestionIndex++;
+                loadQuestion();
+            }
+        }
+
+        function endGame(won) {
+            gameActive = false;
+            clearInterval(timerInterval);
+            endScreen.classList.remove('hidden');
+            document.getElementById('final-score').textContent = `${score} / ${questions.length}`;
+            if (won) {
+                document.getElementById('end-icon').textContent = '🏆';
+                document.getElementById('end-title').textContent = 'Tahniah, Master Petir!';
+                document.getElementById('end-desc').textContent = 'Anda berjaya menawan semua soalan Sifir 4 dengan cemerlang!';
+            } else {
+                document.getElementById('end-icon').textContent = '⚡';
+                document.getElementById('end-title').textContent = 'Permainan Tamat';
+                document.getElementById('end-desc').textContent = 'Jangan putus asa, cuba lagi untuk menjadi juara Sifir 4!';
+            }
+        }
+
+        function resetGame() {
+            startGame();
+        }
+
+        function triggerFlash(color) {
+            ctxFx.fillStyle = color;
+            ctxFx.fillRect(0, 0, fxCanvas.width, fxCanvas.height);
+            setTimeout(() => {
+                ctxFx.clearRect(0, 0, fxCanvas.width, fxCanvas.height);
+            }, 200);
+        }
+
+        function drawLightningBolt(x1, y1, x2, y2) {
+            ctxFx.strokeStyle = '#facc15';
+            ctxFx.lineWidth = 4;
+            ctxFx.shadowBlur = 15;
+            ctxFx.shadowColor = '#38bdf8';
+            ctxFx.beginPath();
+            ctxFx.moveTo(x1, y1);
+            
+            let segments = 6;
+            let dx = (x2 - x1) / segments;
+            let dy = (y2 - y1) / segments;
+            
+            for (let i = 1; i < segments; i++) {
+                let rx = x1 + dx * i + (Math.random() - 0.5) * 40;
+                let ry = y1 + dy * i + (Math.random() - 0.5) * 40;
+                ctxFx.lineTo(rx, ry);
+            }
+            ctxFx.lineTo(x2, y2);
+            ctxFx.stroke();
+            ctxFx.shadowBlur = 0;
+
+            setTimeout(() => {
+                ctxFx.clearRect(0, 0, fxCanvas.width, fxCanvas.height);
+            }, 300);
+        }
+
+        // --- MediaPipe Hands Setup ---
+        const videoElement = document.getElementById('webcam');
+        const canvasElement = document.getElementById('output_canvas');
+        const canvasCtx = canvasElement.getContext('2d');
+
+        function onResults(results) {
+            if (!gameActive) return;
+
+            canvasCtx.save();
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+            canvasCtx.drawImage(results.image, 0, canvasElement.width, canvasElement.width); // simple draw or scale
+
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                const landmarks = results.multiHandLandmarks[0];
+                
+                // Draw hand skeleton lightly
+                drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, {color: 'rgba(56, 189, 248, 0.4)', lineWidth: 2});
+                drawLandmarks(canvasCtx, landmarks, {color: '#facc15', lineWidth: 1, radius: 3});
+
+                // Index fingertip (landmark 8) and Wrist (0)
+                const indexTip = landmarks[8];
+                const wrist = landmarks[0];
+                const thumbTip = landmarks[4];
+
+                // Calculate screen coordinates (mirrored X)
+                const screenX = (1 - indexTip.x) * fxCanvas.width;
+                const screenY = indexTip.y * fxCanvas.height;
+
+                handCursor.style.left = `${(indexTip.x) * 100}%`; // Note: video container handles mirroring via CSS, or adjust accordingly
+                handCursor.style.top = `${indexTip.y * 100}%`;
+                handCursor.classList.remove('hidden');
+
+                // Determine Gesture: Fist Check vs Open Palm
+                // Check distance between fingertips and wrist to estimate if fist is closed
+                let totalDist = 0;
+                [4, 8, 12, 16, 20].forEach(idx => {
+                    const tip = landmarks[idx];
+                    const dist = Math.hypot(tip.x - wrist.x, tip.y - wrist.y);
+                    totalDist += dist;
+                });
+                const avgDist = totalDist / 5;
+                const isFist = avgDist < 0.28; // threshold for closed fist / clench
+
+                if (isFist) {
+                    gestureInstruction.textContent = "⚡ Genggaman dikesan! Melancar petir...";
+                    handCursor.classList.add('bg-yellow-400', 'border-yellow-200');
+                } else {
+                    gestureInstruction.textContent = "Tunjuk tapak tangan & halakan ke jawapan untuk mengunci!";
+                    handCursor.classList.remove('bg-yellow-400', 'border-yellow-200');
+                }
+
+                // Hit test against choice cards
+                let hoveredChoice = null;
+                const choiceElements = document.querySelectorAll('.choice-card');
+                choiceElements.forEach((el, idx) => {
+                    const rect = el.getBoundingClientRect();
+                    const arenaRect = fxCanvas.getBoundingClientRect();
+                    // map screenX/screenY relative to arena
+                    const absCursorX = el.parentElement.parentElement.getBoundingClientRect().left + (indexTip.x * el.parentElement.parentElement.offsetWidth);
+                    // Simplified bounding box check in DOM space
+                    const clientX = window.innerWidth * (1 - indexTip.x);
+                    const clientY = window.innerHeight * indexTip.y;
+
+                    // Easier check using relative client coordinates
+                    const box = el.getBoundingClientRect();
+                    // We can map normalized indexTip coordinates directly to window client coordinates
+                    const cursorClientX = window.innerWidth * (1 - indexTip.x); // mirrored video
+                    // Actually let's use elementFromPoint or simple bounding rect check
+                });
+
+                // Let's use robust clientBoundingRect check for cursor position
+                const cursorElX = window.innerWidth * (1 - indexTip.x);
+                const cursorElY = window.innerHeight * indexTip.y;
+
+                let activeCardIdx = null;
+                choiceElements.forEach((el, idx) => {
+                    const rect = el.getBoundingClientRect();
+                    if (cursorElX >= rect.left && cursorElX <= rect.right && cursorElY >= rect.top && cursorElY <= rect.bottom) {
+                        activeCardIdx = idx;
+                    }
+                });
+
+                if (activeCardIdx !== null) {
+                    if (lockedChoiceIndex === activeCardIdx) {
+                        lockTimer++;
+                        let percent = Math.min(100, (lockTimer / requiredLockFrames) * 100);
+                        lockProgress.style.width = `${percent}%`;
+                        lockStatus.textContent = `Mengunci Pilihan ${activeCardIdx + 1} (${Math.round(percent)}%)...`;
+                        document.getElementById(`choice-${activeCardIdx}`).classList.add('neon-box-active');
+
+                        if (lockTimer >= requiredLockFrames) {
+                            // Trigger selection and strike!
+                            triggerSelection(activeCardIdx);
+                            lockTimer = 0;
+                            lockedChoiceIndex = null;
+                        }
+                    } else {
+                        lockedChoiceIndex = activeCardIdx;
+                        lockTimer = 0;
+                        playSound('lock');
+                    }
+                } else {
+                    // reset lock if cursor moves away
+                    if (lockTimer > 0) {
+                        lockTimer = Math.max(0, lockTimer - 2);
+                        lockProgress.style.width = `${(lockTimer / requiredLockFrames) * 100}%`;
+                    }
+                    lockStatus.textContent = "Cari Pilihan...";
+                    choiceElements.forEach(el => el.classList.remove('neon-box-active'));
+                }
+
+            } else {
+                handCursor.classList.add('hidden');
+                gestureInstruction.textContent = "Tiada tangan dikesan. Sila angkat tangan di depan kamera.";
+                lockStatus.textContent = "Menunggu Tangan...";
+            }
+
+            canvasCtx.restore();
+        }
+
+        function triggerSelection(selectedIndex) {
+            playSound('strike');
+            const q = questions[currentQuestionIndex];
+            const chosenVal = q.options[selectedIndex];
+            const isCorrect = (chosenVal === q.answer);
+
+            // Draw lightning from center to choice card
+            const choiceEl = document.getElementById(`choice-${selectedIndex}`);
+            const rect = choiceEl.getBoundingClientRect();
+            const arenaRect = fxCanvas.getBoundingClientRect();
+            const targetX = rect.left + rect.width / 2 - arenaRect.left;
+            const targetY = rect.top + rect.height / 2 - arenaRect.top;
+            drawLightningBolt(fxCanvas.width / 2, fxCanvas.height / 2, targetX, targetY);
+
+            if (isCorrect) {
+                score++;
+                scoreVal.textContent = score;
+                triggerFlash('rgba(34, 197, 94, 0.3)');
+                choiceEl.classList.add('bg-green-600/80', 'border-green-400');
+            } else {
+                lives--;
+                updateLivesDisplay();
+                triggerFlash('rgba(239, 68, 68, 0.3)');
+                choiceEl.classList.add('bg-red-600/80', 'border-red-400');
+            }
+
+            setTimeout(() => {
+                if (lives <= 0) {
+                    endGame(false);
+                } else {
+                    currentQuestionIndex++;
+                    loadQuestion();
+                }
+            }, 800);
+        }
+
+        // Initialize MediaPipe Hands
+        const hands = new Hands({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+        });
+
+        hands.setOptions({
+            maxNumHands: 1,
+            modelComplexity: 1,
+            minDetectionConfidence: 0.6,
+            minTrackingConfidence: 0.6
+        });
+
+        hands.onResults(onResults);
+
+        const camera = new Camera(videoElement, {
+            onFrame: async () => {
+                await hands.send({image: videoElement});
+            },
+            width: 640,
+            height: 480
+        });
+
+        camera.start().then(() => {
+            document.getElementById('cam-status-dot').classList.remove('bg-red-500', 'animate-ping');
+            document.getElementById('cam-status-dot').classList.add('bg-green-500');
+            document.getElementById('cam-status-text').textContent = 'Kamera Aktif';
+        }).catch(err => {
+            console.error("Camera access error:", err);
+            document.getElementById('cam-status-text').textContent = 'Kamera Gagal';
+        });
+
+        // Helper drawing functions from MediaPipe
+        function drawConnectors(ctx, landmarks, connections, style) {
+            canvasUtilsDrawConnectors(ctx, landmarks, connections, style);
+        }
+        function drawLandmarks(ctx, landmarks, style) {
+            canvasUtilsDrawLandmarks(ctx, landmarks, style);
+        }
+    </script>
+    <!-- MediaPipe drawing utils CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script>
+        // Aliases for MediaPipe drawing utils
+        function canvasUtilsDrawConnectors(ctx, landmarks, connections, style) {
+            if (typeof drawConnectors === 'function') {
+                drawConnectors(ctx, landmarks, connections, style);
+            }
+        }
+        function canvasUtilsDrawLandmarks(ctx, landmarks, style) {
+            if (typeof drawLandmarks === 'function') {
+                drawLandmarks(ctx, landmarks, style);
+            }
+        }
+    </script>
+</body>
+</html>
